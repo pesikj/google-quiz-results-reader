@@ -1,0 +1,6 @@
+/data/
+/templates/
+/.env
+/credentials.json
+/.venv/
+/.idea/

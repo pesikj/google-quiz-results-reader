@@ -15,6 +15,8 @@ def _load_saved_results() -> List[pd.DataFrame]:
     data = []
     for sub_directory in sub_directories:
         sub_directory = os.path.join("data", sub_directory)
+        if not os.path.isdir(sub_directory):
+            continue
         for file in os.listdir(sub_directory):
             file_path = os.path.join(sub_directory, file)
             if not file_path.endswith(".csv"):
@@ -65,10 +67,7 @@ def _send_email(email_to: List[str], results_df: pd.DataFrame, course_name: str,
     server.send_message(msg)
 
 
-def process_results(course_name):
-    results_df = _load_saved_results()
-    max_score_df = [_get_max_score(df) for df in results_df]
-    max_score_df = pd.concat(max_score_df)
+def _send_emails(course_name, results_df, max_score_df):
     email_addresses = pd.concat(results_df)[["Email address"]].dropna()
     server = smtplib.SMTP(os.getenv("SMTP_HOST"), 587)
     server.starttls()
@@ -78,3 +77,16 @@ def process_results(course_name):
             email_addresses[email_addresses["Email address"].str.startswith(email_prefix)]["Email address"].tolist()))
         _send_email(email_to, max_score_df[max_score_df["Email prefix"] == email_prefix], course_name, server)
     server.quit()
+
+
+def _save_pivot(course_name: str, max_score_df: pd.DataFrame):
+    max_score_df_pivot = pd.pivot(max_score_df, index="Email prefix", columns="Quiz Number", values="Percent")
+    max_score_df_pivot.to_excel(os.path.join("data", f"{course_name}.xlsx"))
+
+def process_results(course_name, send_emails=False):
+    results_df = _load_saved_results()
+    max_score_df = [_get_max_score(df) for df in results_df]
+    max_score_df = pd.concat(max_score_df)
+    _save_pivot(course_name, max_score_df)
+    if send_emails:
+        _send_emails(course_name, results_df, max_score_df)
